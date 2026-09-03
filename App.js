@@ -368,10 +368,7 @@ export default function App() {
     setGameState('category');
   };
 
-  const exitGame = () => {
-    setPlayers([]);
-    setGameState('lobby');
-  };
+  const returnToLobby = () => setGameState('lobby');
 
   // --- RENDERERS ---
   const renderLobby = () => (
@@ -443,7 +440,17 @@ export default function App() {
 
   const renderCategories = () => (
     <View style={styles.phaseContainer}>
-      <Text style={[styles.pixelTitle, {fontSize: 30}, {color: '#FFF'}, {textAlign: 'center'}]}>Select Categories</Text>
+      <View style={styles.pageHeader}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Back to players"
+          onPress={returnToLobby}
+          style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
+        >
+          <Text style={styles.backButtonText}>{'\u2039 BACK'}</Text>
+        </Pressable>
+        <Text style={[styles.pixelTitle, styles.pageTitle]}>Select Categories</Text>
+      </View>
       <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
         <View style={styles.categoryGrid}>
           {CATEGORIES.map(cat => {
@@ -623,7 +630,7 @@ export default function App() {
           <PixelButton 
             imageUp={require('./assets/btn_long_up.png')} 
             imageDown={require('./assets/btn_long_down.png')}
-            onPress={exitGame}
+            onPress={returnToLobby}
             style={[styles.mainButton, { flex: 1, marginLeft: 5 }]}
           >
             <Text style={styles.pixelButtonText}>EXIT</Text>
@@ -668,6 +675,11 @@ const styles = StyleSheet.create({
   inner: { flex: 1, paddingHorizontal: 20, paddingTop: 20 },
   phaseContainer: { flex: 1 },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  pageHeader: { marginBottom: 4 },
+  pageTitle: { fontSize: 30, color: '#FFF', textAlign: 'center', marginBottom: 0 },
+  backButton: { alignSelf: 'flex-start', paddingVertical: 8, paddingRight: 12 },
+  backButtonPressed: { opacity: 0.6 },
+  backButtonText: { fontFamily: pixelFont, fontSize: 16, color: '#FFF' },
   
   // Typography
   pixelTitle: { fontFamily: pixelFont, fontSize: 20, color: '#000', textShadowColor: '#000', textShadowOffset: { width: 2, height: 2 }, textShadowRadius: 0, marginBottom: 10 },
