@@ -41,10 +41,12 @@ plausible but hard to give clues for. Categories carry custom prompt rules
 
 ```sh
 npm install
-EXPO_PUBLIC_OPENAI_API_KEY=<key> npx expo start
+EXPO_PUBLIC_OPENAI_API_KEY=<key> npx expo start --tunnel
 ```
 
-Press `a` for Android or `i` for iOS, or scan the QR code with Expo Go.
+Press `a` for Android or `i` for iOS, or scan the QR code with Expo Go. The
+`--tunnel` flag routes the dev server through ngrok so devices on other
+networks can connect.
 The OpenAI key is only required when an imposter is dealt.
 
 Builds are managed with [EAS](eas.json): `eas build` for development,
