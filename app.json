@@ -1,15 +1,15 @@
 {
   "expo": {
-    "name": "imposter-game",
+    "name": "ImposterAI",
     "slug": "imposter-game",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#000000"
     },
     "ios": {
       "supportsTablet": true
@@ -17,13 +17,22 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+        "foregroundImage": "./assets/android-icon-foreground-IAI.png",
+        "backgroundImage": "./assets/android-icon-background-IAI.png",
+        "monochromeImage": "./assets/android-icon-monochrome-IAI.png"
+      },
+      "package": "com.jdeng.impostergame"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "8ab45bbf-2e89-4ac1-a6c7-8d95d9686cbd"
+      }
+    },
+    "plugins": [
+      "expo-font"
+    ]
   }
 }
