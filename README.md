@@ -32,10 +32,15 @@ Two hidden twists: there is a 1-in-10 chance a round has no imposter at all.
 | Memes | [Imgflip](https://imgflip.com) `get_memes` |
 | TV Shows & Movies, Animals, Food, Objects, Computer Science | Built-in word lists |
 
-For imposter rounds, the game sends the target word and a category-specific
-prompt to the OpenAI API (`o3`), which generates a decoy word designed to be
-plausible but hard to give clues for. Categories carry custom prompt rules
-(banned associations, semantic difficulty target, divergent brainstorm lenses).
+The app downloads eight ready-to-play rounds in one OpenAI request and saves
+them on the device. Later rounds use those saved game states, so the game does
+not need a live OpenAI connection each time. Image-based categories also ask
+the operating system to cache their artwork.
+
+Once a category's pack is empty, the app asks the player to connect and
+download another pack or replay a game that the device has already used. The
+first round for a category needs internet access so the app can create its
+initial pack.
 
 ## Running
 
@@ -47,7 +52,7 @@ EXPO_PUBLIC_OPENAI_API_KEY=<key> npx expo start --tunnel
 Press `a` for Android or `i` for iOS, or scan the QR code with Expo Go. The
 `--tunnel` flag routes the dev server through ngrok so devices on other
 networks can connect.
-The OpenAI key is only required when an imposter is dealt.
+The OpenAI key is required when the app downloads a game pack.
 
 Builds are managed with [EAS](eas.json): `eas build` for development,
 preview (APK), and production profiles.
