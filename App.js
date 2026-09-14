@@ -1,6 +1,13 @@
 import React, { useState } from 'react';
 import { getTop200PopularAnimeClean, getTop200Characters, getLeagueCharacters, getTopMemes } from './api.js';
 import {
+  GAME_PACK_SIZE,
+  getPackCounts,
+  reuseGamePack,
+  saveGamePack,
+  takeSavedGame,
+} from './gamePacks.js';
+import {
   StyleSheet,
   Text,
   View,
@@ -172,6 +179,110 @@ Target Word: ${targetWord}
 **Output:** Output exactly: "Final Word: [Your Word]"`;
 };
 
+const pickRandomEntries = (entries, count) => {
+  const shuffled = [...entries].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, Math.min(count, shuffled.length));
+};
+
+const getCategoryEntries = async (category) => {
+  if (category === 'Anime Shows') {
+    const animeList = await getTop200PopularAnimeClean();
+    return animeList.map(item => ({ targetWord: item.title, targetWordImage: item.cover }));
+  }
+  if (category === 'Anime Characters') {
+    const characterList = await getTop200Characters();
+    return characterList.map(item => ({ targetWord: item.name, targetWordImage: item.image }));
+  }
+  if (category === 'League of Legends') {
+    const championList = await getLeagueCharacters();
+    return championList.map(item => ({ targetWord: item.name, targetWordImage: item.image }));
+  }
+  if (category === 'Memes') {
+    const memeList = await getTopMemes();
+    return memeList.map(item => ({ targetWord: item.name, targetWordImage: item.image }));
+  }
+
+  return WORD_DATABASE[category].map(targetWord => ({ targetWord, targetWordImage: null }));
+};
+
+const parseGamePackResponse = (content) => {
+  const cleaned = content.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+  const parsed = JSON.parse(cleaned);
+  return Array.isArray(parsed) ? parsed : parsed.games;
+};
+
+const downloadGamePack = async (category) => {
+  if (!OPENAI_API_KEY) throw new Error('No OpenAI API key is configured.');
+
+  const entries = pickRandomEntries(await getCategoryEntries(category), GAME_PACK_SIZE);
+  const targetWords = entries.map(entry => entry.targetWord);
+  const categoryInstructions = getPromptForCategory(category, targetWords[0]).split('**Input:**')[0];
+  const packPrompt = `${categoryInstructions}
+
+Generate a separate imposter clue for every target word below. Apply the same rules independently to each word.
+Target words: ${JSON.stringify(targetWords)}
+
+Return only valid JSON in this shape:
+{"games":[{"targetWord":"the exact supplied target word","imposterWord":"the clue"}]}`;
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: 'o3',
+      messages: [{ role: 'user', content: packPrompt }],
+      response_format: { type: 'json_object' },
+    }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error?.message || `OpenAI request failed (${response.status}).`);
+
+  const generatedGames = parseGamePackResponse(data.choices?.[0]?.message?.content || '');
+  if (!Array.isArray(generatedGames)) throw new Error('OpenAI returned an invalid game pack.');
+
+  const cluesByTarget = new Map(
+    generatedGames
+      .filter(game => game?.targetWord && game?.imposterWord)
+      .map(game => [game.targetWord.trim().toLocaleLowerCase(), game.imposterWord.trim()])
+  );
+  const games = entries
+    .filter(entry => cluesByTarget.has(entry.targetWord.toLocaleLowerCase()))
+    .map(entry => ({
+      ...entry,
+      category,
+      imposterWord: cluesByTarget.get(entry.targetWord.toLocaleLowerCase()),
+    }));
+
+  if (games.length !== entries.length) throw new Error('OpenAI returned an incomplete game pack.');
+
+  await Promise.allSettled(
+    games.filter(game => game.targetWordImage).map(game => Image.prefetch(game.targetWordImage))
+  );
+  await saveGamePack(category, games);
+  return games.length;
+};
+
+const askHowToRefillPack = (category, canReuse) => new Promise((resolve) => {
+  const buttons = [
+    { text: 'Cancel', style: 'cancel', onPress: () => resolve('cancel') },
+  ];
+  if (canReuse) {
+    buttons.push({ text: 'Reuse Saved Pack', onPress: () => resolve('reuse') });
+  }
+  buttons.push({ text: 'Connect & Download', onPress: () => resolve('download') });
+
+  Alert.alert(
+    'Game pack empty',
+    `You have used every saved ${category} game. Connect to download ${GAME_PACK_SIZE} new games${canReuse ? ', or replay one from this device' : ''}.`,
+    buttons,
+    { cancelable: true, onDismiss: () => resolve('cancel') }
+  );
+});
+
 // --- CUSTOM PIXEL COMPONENT ---
 const PixelButton = ({ imageUp, imageDown, onPress, disabled, style, children, onLongPress, delayLongPress }) => {
   const [isPressed, setIsPressed] = useState(false);
@@ -272,77 +383,43 @@ export default function App() {
     const randomCategory = selectedCategories[Math.floor(Math.random() * selectedCategories.length)];
     setSelectedCategory(randomCategory);
 
-    let randomWord = '';
-    let wordImage = null;
+    let game;
 
     try {
-      if (randomCategory === 'Anime Shows') {
-        const animeList = await getTop200PopularAnimeClean();
-        const pick = animeList[Math.floor(Math.random() * animeList.length)];
-        randomWord = pick.title;
-        wordImage = pick.cover;
-      } else if (randomCategory === 'Anime Characters') {
-        const charList = await getTop200Characters();
-        const pick = charList[Math.floor(Math.random() * charList.length)];
-        randomWord = pick.name;
-        wordImage = pick.image;
-      } else if (randomCategory === 'League of Legends') {
-        const champList = await getLeagueCharacters();
-        const pick = champList[Math.floor(Math.random() * champList.length)];
-        randomWord = pick.name;
-        wordImage = pick.image;
-      } else if (randomCategory === 'Memes') {
-        const memesList = await getTopMemes();
-        const pick = memesList[Math.floor(Math.random() * memesList.length)];
-        randomWord = pick.name;
-        wordImage = pick.image;
-      } else {
-        const wordsInCat = WORD_DATABASE[randomCategory];
-        randomWord = wordsInCat[Math.floor(Math.random() * wordsInCat.length)];
+      const counts = await getPackCounts(randomCategory);
+
+      if (counts.available === 0 && counts.used > 0) {
+        const action = await askHowToRefillPack(randomCategory, true);
+        if (action === 'cancel') {
+          setGameState('category');
+          return;
+        }
+        if (action === 'reuse') {
+          game = await reuseGamePack(randomCategory);
+        }
       }
-    } catch (err) {
-      Alert.alert('API Error', err.message);
+
+      if (!game && counts.available === 0) {
+        setLoadingProgress(`downloading ${GAME_PACK_SIZE} saved games...`);
+        await downloadGamePack(randomCategory);
+      }
+
+      if (!game) game = await takeSavedGame(randomCategory);
+      if (!game) throw new Error('The downloaded game pack was empty.');
+    } catch (error) {
+      console.error('Game pack error:', error);
+      Alert.alert('Could not load a game', `${error.message}\n\nConnect to the internet and try again.`);
       setGameState('category');
       return;
     }
 
-    setTargetWord(randomWord);
-    setTargetWordImage(wordImage);
+    setTargetWord(game.targetWord);
+    setTargetWordImage(game.targetWordImage);
+    setImposterWord(newImposterId === null ? '' : game.imposterWord);
 
-    const promptText = getPromptForCategory(randomCategory, randomWord);
-
-    setLoadingProgress('generating imposter word...');
-
-    if (newImposterId !== null) {
-      // There IS an imposter — generate a fake clue word for them via AI
-      try {
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${OPENAI_API_KEY}`,
-          },
-          body: JSON.stringify({
-            model: 'o3',
-            messages: [{ role: 'user', content: promptText }]
-          }),
-        });
-
-        const data = await response.json();
-        const fullResponse = data.choices[0].message.content;
-        const match = fullResponse.match(/Final Word:\s*(.*)/i);
-
-        setImposterWord(match ? match[1].trim() : 'Error (Fallback)');
-      } catch (error) {
-        console.error("OpenAI Fallback Triggered:", error);
-        Alert.alert('API Error 🚨', `Could not generate word via OpenAI.\nReason: ${error.message}`);
-        setGameState('category');
-        return;
-      }
-    } else {
-      // No-imposters mode, give everyone a 5s buffer on the loading screen
+    if (newImposterId === null) {
+      // No-imposters mode, give everyone a 5s buffer on the loading screen.
       await delay(5000);
-      setImposterWord('');
     }
 
     setRevealIndex(0);
